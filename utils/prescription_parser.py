@@ -10,8 +10,7 @@ from rapidfuzz import fuzz
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 from openai import OpenAI
-from utils.key import GITHUB_TOKEN
-
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 # OpenAI Client
 client = OpenAI(
     base_url="https://models.github.ai/inference",
