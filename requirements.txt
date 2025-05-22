@@ -8,3 +8,4 @@ pydantic
 easyocr
 rapidfuzz
 scipy
+opencv-python
