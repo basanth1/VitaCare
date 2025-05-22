@@ -34,21 +34,35 @@ def main():
         with st.expander("Prescription Image", expanded=False):
             st.image(uploaded_file, caption='Uploaded Prescription Image.', use_column_width=True)
 
-        with st.spinner('Processing Prescription with EasyOCR...'):
+        with st.spinner('Processing Prescription...'):
             final_result = get_prescription_informations([check_path])
             st.session_state.prescription_data = final_result  # Save globally
 
+            # Format additional notes
             if 'additional_notes' in final_result:
                 notes = final_result['additional_notes']
                 notes_formatted = notes.replace("\n", "<br> ") if isinstance(notes, str) else "<br> ".join(notes)
                 final_result['additional_notes'] = f"<ul><li>{notes_formatted}</li></ul>"
 
-            data = [(key, final_result[key]) for key in final_result if key != 'medications']
+            # Replace empty fields with "Not clear (image)"
+            data = []
+            for key in final_result:
+                if key != 'medications':
+                    value = final_result[key]
+                    if value in [None, "", [], {}]:
+                        value = "Not clear (image)"
+                    data.append((key, value))
             df = pd.DataFrame(data, columns=["Field", "Value"])
             st.write(df.to_html(classes='custom-table', index=False, escape=False), unsafe_allow_html=True)
 
+            # Display medications
             if final_result.get("medications"):
-                meds_df = pd.DataFrame(final_result["medications"])
+                meds = final_result["medications"]
+                for med in meds:
+                    for field in med:
+                        if med[field] in [None, "", [], {}]:
+                            med[field] = "Not clear (image)"
+                meds_df = pd.DataFrame(meds)
                 st.subheader("Medications")
                 st.write(meds_df.to_html(classes='custom-table', index=False, escape=False), unsafe_allow_html=True)
 
