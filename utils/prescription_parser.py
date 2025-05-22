@@ -97,11 +97,8 @@ def best_match(ocr_word, choices):
 # ------------------ EasyOCR Parsing ------------------ #
 def parse_with_easyocr(image_path: str) -> dict:
     import cv2
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"[EasyOCR] File does not exist: {image_path}")
-
-    image = cv2.imread(image_path)
-    if image is None:
+    img = cv2.imread(image_path)
+    if img is None:
         raise ValueError(f"[EasyOCR] Image at {image_path} could not be loaded. Is it a valid image?")
 
     result = reader.readtext(image_path, detail=0)
@@ -118,6 +115,7 @@ def parse_with_easyocr(image_path: str) -> dict:
         medications=matched_meds,
         additional_notes="Parsed using fallback EasyOCR due to API failure."
     ).dict()
+
 
 # ------------------ Main Wrapper ------------------ #
 def get_prescription_informations(image_paths: List[str]) -> dict:
