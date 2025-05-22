@@ -8,11 +8,11 @@ import streamlit as st
 import pandas as pd
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
-from utils.key import GITHUB_TOKEN
+
 # Set up OpenAI client with GitHub-hosted GPT-4o model
 client = OpenAI(
     base_url="https://models.github.ai/inference",
-    api_key=GITHUB_TOKEN
+    api_key=os.getenv("GITHUB_TOKEN")
 )
 
 # Streamlit page configuration
