@@ -1,1 +1,24 @@
-run = "python3 app.py"
+run = "python app.py"
+modules = ["web", "python-3.12"]
+
+[deployment]
+run = ["sh", "-c", "python app.py"]
+
+[nix]
+channel = "stable-24_05"
+packages = [
+  "glibcLocales",
+  "hdf5",
+  "libGL",
+  "libGLU",
+  "libxcrypt",
+  "pkg-config",
+  "rapidfuzz-cpp",
+  "taskflow",
+  "xsimd",
+  "python312",
+  "python312Packages.setuptools",
+  "python312Packages.pip",
+  "python312Packages.wheel",
+  "python312Packages.distutils"
+]
