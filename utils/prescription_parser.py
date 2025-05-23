@@ -1,22 +1,16 @@
-import os
 import re
 import base64
-import shutil
 from datetime import datetime
 from typing import List
+from io import BytesIO
 import pandas as pd
-import easyocr
+from PIL import Image
 from rapidfuzz import fuzz
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.pydantic_v1 import BaseModel, Field
-
-# EasyOCR Reader
-reader = easyocr.Reader(['en'])
+from langchain_core.pydantic_v1 import BaseModel
 
 # Load local medicine names
 df_meds = pd.read_csv("data/Medicine_Details_With_Price.csv")
-medicine_names = [re.sub(r'[^A-Za-z0-9\s\-]', '', name).lower()
-                  for name in df_meds["Medicine Name"].dropna().unique()]
+medicine_names = [re.sub(r'[^A-Za-z0-9\s\-]', '', name).lower() for name in df_meds["Medicine Name"].dropna().unique()]
 
 # ------------------ Data Models ------------------ #
 class MedicationItem(BaseModel):
@@ -65,16 +59,22 @@ def best_match(ocr_word, choices):
     return max(scores, key=lambda x: x[1])
 
 # ------------------ EasyOCR Parsing ------------------ #
-def parse_with_easyocr(image_path: str) -> dict:
+def get_prescription_informations_from_bytes(file_bytes: bytes) -> PrescriptionInformations:
+    import easyocr
+    import numpy as np
     import cv2
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"[EasyOCR] File does not exist: {image_path}")
 
-    image = cv2.imread(image_path)
-    if image is None:
-        raise ValueError(f"[EasyOCR] Image at {image_path} could not be loaded. Is it a valid image?")
+    reader = easyocr.Reader(['en'])
 
-    result = reader.readtext(image_path, detail=0)
+    image = Image.open(BytesIO(file_bytes)).convert("RGB")
+    image = image.resize((1024, 1024))
+    image_np = np.array(image)
+    image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+
+    temp_file_path = "/tmp/temp_prescription.jpg"
+    cv2.imwrite(temp_file_path, image_bgr)
+
+    result = reader.readtext(temp_file_path, detail=0)
     candidates = extract_medicine_names(result)
 
     threshold = 65
@@ -87,16 +87,4 @@ def parse_with_easyocr(image_path: str) -> dict:
     return PrescriptionInformations(
         medications=matched_meds,
         additional_notes="Parsed using EasyOCR."
-    ).dict()
-
-# ------------------ Main Wrapper ------------------ #
-def get_prescription_informations(image_paths: List[str]) -> dict:
-    print(f"[Info] Using EasyOCR only for prescription extraction.")
-    return parse_with_easyocr(image_paths[0])  # assumes 1 image
-
-# Optional cleanup
-def remove_temp_folder(path):
-    if os.path.isfile(path) or os.path.islink(path):
-        os.remove(path)
-    elif os.path.isdir(path):
-        shutil.rmtree(path)
+    )
