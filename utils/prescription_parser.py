@@ -1,22 +1,12 @@
 import os
 import re
-import base64
 import shutil
 from datetime import datetime
 from typing import List
 import pandas as pd
 import easyocr
 from rapidfuzz import fuzz
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.pydantic_v1 import BaseModel, Field
-from openai import OpenAI
-from utils.key import GITHUB_TOKEN
-
-# OpenAI Client
-client = OpenAI(
-    base_url="https://models.github.ai/inference",
-    api_key=GITHUB_TOKEN
-)
+from pydantic import BaseModel, Field
 
 # EasyOCR Reader
 reader = easyocr.Reader(['en'])
@@ -42,28 +32,6 @@ class PrescriptionInformations(BaseModel):
     prescription_date: datetime = datetime.today()
     medications: List[MedicationItem] = []
     additional_notes: str = ""
-
-# ------------------ LangChain Function ------------------ #
-def query_github_gpt4o(images_base64: list, prompt: str) -> str:
-    image_payloads = [
-        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}}
-        for img in images_base64
-    ]
-
-    messages = [
-        {"role": "system", "content": "You are an expert medical transcriptionist."},
-        {"role": "user", "content": [{"type": "text", "text": prompt}] + image_payloads}
-    ]
-
-    response = client.chat.completions.create(
-        messages=messages,
-        model="openai/gpt-4o",
-        temperature=0.5,
-        max_tokens=4096,
-        top_p=1
-    )
-
-    return response.choices[0].message.content
 
 # ------------------ OCR Helper Functions ------------------ #
 def extract_medicine_names(ocr_phrases):
@@ -114,34 +82,31 @@ def parse_with_easyocr(image_path: str) -> dict:
         if score >= threshold:
             matched_meds.append(MedicationItem(name=match))
 
+    additional_notes = "Parsed using EasyOCR."
+    if not matched_meds:
+        additional_notes = "Text cannot be extracted because the image is not clear."
+
     return PrescriptionInformations(
         medications=matched_meds,
-        additional_notes="Parsed using fallback EasyOCR due to API failure."
+        additional_notes=additional_notes
     ).dict()
 
 # ------------------ Main Wrapper ------------------ #
 def get_prescription_informations(image_paths: List[str]) -> dict:
-    parser = JsonOutputParser(pydantic_object=PrescriptionInformations)
-    images_base64 = [base64.b64encode(open(img, "rb").read()).decode("utf-8") for img in image_paths]
-
-    prompt = """
-    Given the images, provide all available information including:
-    - Patient's name, age, and gender
-    - Doctor's name and license number
-    - Prescription date
-    - List of medications with name, dosage, frequency, and duration
-    - Additional notes or instructions
-    Note: If portions of the image are not clear then leave the values as empty. Do not make up the values.
-    """ + parser.get_format_instructions()
-
     try:
-        output_text = query_github_gpt4o(images_base64, prompt)
-        return parser.parse(output_text)
-
-    except Exception as e:
-        print(f"[Fallback] GPT-4o failed. Switching to EasyOCR: {e}")
-        print(f"[Debug] File exists: {os.path.exists(image_paths[0])}, Path: {image_paths[0]}")
         return parse_with_easyocr(image_paths[0])  # assumes 1 image
+    except Exception as e:
+        print(f"[Error] EasyOCR failed: {e}")
+        return {
+            "patient_name": "",
+            "patient_age": 0,
+            "patient_gender": "",
+            "doctor_name": "",
+            "doctor_license": "",
+            "prescription_date": datetime.today(),
+            "medications": [],
+            "additional_notes": "Text cannot be extracted because the image is not clear."
+        }
 
 # Optional cleanup
 def remove_temp_folder(path):
