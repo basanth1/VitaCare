@@ -43,9 +43,17 @@ def main():
                 notes_formatted = notes.replace("\n", "<br> ") if isinstance(notes, str) else "<br> ".join(notes)
                 final_result['additional_notes'] = f"<ul><li>{notes_formatted}</li></ul>"
 
-            data = [(key, final_result[key]) for key in final_result if key != 'medications']
-            df = pd.DataFrame(data, columns=["Field", "Value"])
-            st.write(df.to_html(classes='custom-table', index=False, escape=False), unsafe_allow_html=True)
+                data = []
+                for key in final_result:
+                    if key != 'medications':
+                        value = final_result[key]
+                        if not value:  # Covers None, "", 0, etc.
+                            value = "Text can't be extracted because the image is not clear"
+                        data.append((key, value))
+                
+                df = pd.DataFrame(data, columns=["Field", "Value"])
+                st.write(df.to_html(classes='custom-table', index=False, escape=False), unsafe_allow_html=True)
+
 
             if final_result.get("medications"):
                 meds_df = pd.DataFrame(final_result["medications"])
